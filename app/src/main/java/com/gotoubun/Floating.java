@@ -22,6 +22,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Base64;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Gravity;
@@ -55,7 +56,7 @@ import java.util.Map;
 
 public class Floating extends Service {
 
-    static final String TAG = "Menu";
+    static final String TAG = "LABMOD_DEBUG";
 
     private Activity hostActivity;
     private WindowManager wm;
@@ -68,30 +69,31 @@ public class Floating extends Service {
     private final Application.ActivityLifecycleCallbacks lifecycleCallbacks =
         new Application.ActivityLifecycleCallbacks() {
             @Override
-            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {}
+            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                Log.d(TAG, "onActivityCreated: " + activity.getClass().getName());
+            }
 
             @Override
-            public void onActivityStarted(Activity activity) {}
+            public void onActivityStarted(Activity activity) {
+                Log.d(TAG, "onActivityStarted: " + activity.getClass().getName());
+            }
 
             @Override
             public void onActivityResumed(Activity activity) {
-                if (isGameActivity(activity)) {
-                    showViews(activity);
-                }
+                Log.d(TAG, "onActivityResumed: " + activity.getClass().getName());
+                showViews(activity);
             }
 
             @Override
             public void onActivityPaused(Activity activity) {
-                if (isGameActivity(activity)) {
-                    pauseViews();
-                }
+                Log.d(TAG, "onActivityPaused: " + activity.getClass().getName());
+                pauseViews();
             }
 
             @Override
             public void onActivityStopped(Activity activity) {
-                if (isGameActivity(activity)) {
-                    pauseViews();
-                }
+                Log.d(TAG, "onActivityStopped: " + activity.getClass().getName());
+                pauseViews();
             }
 
             @Override
@@ -99,9 +101,8 @@ public class Floating extends Service {
 
             @Override
             public void onActivityDestroyed(Activity activity) {
-                if (isGameActivity(activity)) {
-                    releaseViews();
-                }
+                Log.d(TAG, "onActivityDestroyed: " + activity.getClass().getName());
+                releaseViews();
             }
         };
 
@@ -199,26 +200,47 @@ public class Floating extends Service {
     
 
     private boolean isGameActivity(Activity activity) {
-        if (activity == null) return false;
+        if (activity == null) {
+            Log.d(TAG, "isGameActivity: activity is NULL");
+            return false;
+        }
         String name = activity.getClass().getName();
+        Log.d(TAG, "isGameActivity: checking '" + name + "' against 'com.tencent.tmgp.cod.CODMainActivity'");
         return "com.tencent.tmgp.cod.CODMainActivity".equals(name);
     }
 
     private void showViews(Activity activity) {
         synchronized (lock) {
-            if (hasAdded && hostActivity == activity) return;
+            Log.d(TAG, "showViews() called for: " + activity.getClass().getName());
+            if (hasAdded && hostActivity == activity) {
+                Log.d(TAG, "showViews() SKIP: views already added for same activity");
+                return;
+            }
             if (hasAdded && hostActivity != activity) {
+                Log.d(TAG, "showViews() host changed, releasing old views");
                 releaseViews();
             }
             if (!hasAdded) {
+                Log.d(TAG, "showViews() creating views for first time");
                 hostActivity = activity;
                 wm = activity.getWindowManager();
+                Log.d(TAG, "showViews() WindowManager: " + (wm != null ? "OK" : "NULL"));
                 createViews(activity);
+                Log.d(TAG, "showViews() canvasLayout: " + (canvasLayout != null ? "OK" : "NULL"));
+                Log.d(TAG, "showViews() iconLayout: " + (iconLayout != null ? "OK" : "NULL"));
+                Log.d(TAG, "showViews() renderLp: " + (renderLp != null ? "OK" : "NULL"));
+                Log.d(TAG, "showViews() touchLp: " + (touchLp != null ? "OK" : "NULL"));
                 try {
                     wm.addView(canvasLayout, renderLp);
+                    Log.d(TAG, "showViews() addView(canvasLayout) SUCCESS");
                     wm.addView(iconLayout, touchLp);
+                    Log.d(TAG, "showViews() addView(iconLayout) SUCCESS");
                     hasAdded = true;
                 } catch (SecurityException ex) {
+                    Log.e(TAG, "showViews() SecurityException: " + ex.getMessage());
+                    ex.printStackTrace();
+                } catch (Exception ex) {
+                    Log.e(TAG, "showViews() Exception: " + ex.getMessage());
                     ex.printStackTrace();
                 }
             }
@@ -230,7 +252,9 @@ public class Floating extends Service {
                 try {
                     wm.updateViewLayout(canvasLayout, renderLp);
                     wm.updateViewLayout(iconLayout, touchLp);
-                } catch (Exception ignored) {
+                    Log.d(TAG, "showViews() updateViewLayout SUCCESS");
+                } catch (Exception ex) {
+                    Log.e(TAG, "showViews() updateViewLayout failed: " + ex.getMessage());
                 }
                 if (mUpdateThread != null && !mUpdateThread.isAlive()) {
                     mUpdateThread.start();
@@ -238,6 +262,7 @@ public class Floating extends Service {
                 if (mUpdateCanvas != null && !mUpdateCanvas.isAlive()) {
                     mUpdateCanvas.start();
                 }
+                Log.d(TAG, "showViews() COMPLETE - overlay should be visible");
             }
         }
     }
@@ -391,6 +416,7 @@ public class Floating extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "=== Floating.onStartCommand() ===");
         super.onStartCommand(intent, flags, startId);
         return START_NOT_STICKY;
     }
@@ -403,6 +429,7 @@ public class Floating extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "=== Floating.onCreate() ===");
         configPrefs = getSharedPreferences("config", MODE_PRIVATE);
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         Point screenSize = new Point();
@@ -428,7 +455,11 @@ public class Floating extends Service {
         Application app = getApplication();
         if (app != null) {
             app.registerActivityLifecycleCallbacks(lifecycleCallbacks);
+            Log.d(TAG, "onCreate: lifecycle callbacks REGISTERED");
+        } else {
+            Log.e(TAG, "onCreate: getApplication() returned NULL - cannot register callbacks");
         }
+        Log.d(TAG, "=== Floating.onCreate() COMPLETE ===");
     }
 	
 
